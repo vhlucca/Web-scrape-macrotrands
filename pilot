@@ -1,0 +1,96 @@
+import lxml
+from lxml import html
+import requests
+import numpy as np
+import pandas as pd
+
+url_tickers = 'https://www.macrotrends.net/assets/php/ticker_search_list.php' 
+page_tickers = requests.get(url_tickers)
+
+json_data = page_tickers.json()
+df_tickers = pd.DataFrame(json_data)
+new = df_tickers['s'].str.split("/", n = 1, expand = True) 
+df_tickers['Ticker'] = new[0]
+df_tickers['Company'] = new[1]
+#df_tickers
+
+
+url_revenue = 'https://www.macrotrends.net/stocks/charts/IBM/ibm/revenue'
+
+# Fetch the page that we're going to parse
+page_revenue = requests.get(url_revenue)
+
+# Parse the page with LXML, so that we can start doing some XPATH queries
+# to extract the data that we want
+tree_revenue = html.fromstring(page_revenue.content)
+
+# Using XPATH, fetch all table elements on the page
+table_revenue = tree_revenue.xpath('//table') 
+
+# Now that we've got the table element, convert it back to a string,
+# so that it can be parsed by Pandas
+tstring_revenue_A = lxml.etree.tostring(table_revenue[0], method='html')
+tstring_revenue_Q = lxml.etree.tostring(table_revenue[1], method='html')
+
+# Read the HTML table into a Pandas DataFrame - read_html
+# is designed to read HTML tables into a list of dataframe objects,
+# one dataframe for each table.
+
+#DataFrame Annual Revenue
+df_revenue_A = pd.read_html(tstring_revenue_A)[0]
+df_revenue_A['Period'] = 'A'
+df_revenue_A['Description'] = df_revenue_A.columns[0]
+df_revenue_A.rename(columns={df_revenue_A.columns[0]:'Time', df_revenue_A.columns[1]:'Value'}, inplace=True)
+
+#DataFrame Quartely Revenue
+df_revenue_Q = pd.read_html(tstring_revenue_Q)[0]
+df_revenue_Q['Period'] = 'Q'
+df_revenue_Q['Description'] = df_revenue_Q.columns[0]
+df_revenue_Q.rename(columns={df_revenue_Q.columns[0]:'Time', df_revenue_Q.columns[1]:'Value'}, inplace=True)
+
+df_revenue_A
+#df_revenue_Q
+df = pd.DataFrame(columns=['Time','Value', 'Period', 'Description'])
+df = df.append(df_revenue_A, ignore_index=True)
+df = df.append(df_revenue_Q, ignore_index=True)
+
+
+
+url_cost = 'https://www.macrotrends.net/stocks/charts/IBM/ibm/cost-goods-sold'
+
+# Fetch the page that we're going to parse
+page_cost = requests.get(url_cost)
+
+# Parse the page with LXML, so that we can start doing some XPATH queries
+# to extract the data that we want
+tree_cost = html.fromstring(page_cost.content)
+
+# Using XPATH, fetch all table elements on the page
+table_cost = tree_cost.xpath('//table') 
+
+# Now that we've got the table element, convert it back to a string,
+# so that it can be parsed by Pandas
+tstring_cost_A = lxml.etree.tostring(table_cost[0], method='html')
+tstring_cost_Q = lxml.etree.tostring(table_cost[1], method='html')
+
+# Read the HTML table into a Pandas DataFrame - read_html
+# is designed to read HTML tables into a list of dataframe objects,
+# one dataframe for each table.
+
+#DataFrame Annual Revenue
+df_cost_A = pd.read_html(tstring_cost_A)[0]
+df_cost_A['Period'] = 'A'
+df_cost_A['Description'] = df_cost_A.columns[0]
+df_cost_A.rename(columns={df_cost_A.columns[0]:'Time', df_cost_A.columns[1]:'Value'}, inplace=True)
+
+#DataFrame Quartely Revenue
+df_cost_Q = pd.read_html(tstring_cost_Q)[0]
+df_cost_Q['Period'] = 'Q'
+df_cost_Q['Description'] = df_cost_Q.columns[0]
+df_cost_Q.rename(columns={df_cost_Q.columns[0]:'Time', df_cost_Q.columns[1]:'Value'}, inplace=True)
+
+df_revenue_A
+#df_revenue_Q
+df = pd.DataFrame(columns=['Time','Value', 'Period', 'Description'])
+df = df.append(df_cost_A, ignore_index=True)
+df = df.append(df_cost_Q, ignore_index=True)
