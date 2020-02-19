@@ -1,0 +1,35 @@
+import lxml
+from lxml import html
+import requests
+import numpy as np
+import pandas as pd
+
+url_tickers = 'https://www.macrotrends.net/assets/php/ticker_search_list.php' 
+page_tickers = requests.get(url_tickers)
+
+json_data = page_tickers.json()
+df_tickers = pd.DataFrame(json_data)
+new = df_tickers['s'].str.split("/", n = 1, expand = True) 
+df_tickers['Ticker'] = new[0]
+df_tickers['Company'] = new[1]
+#df_tickers
+
+ticker = 'IBM'
+company_name = 'ibm'
+report = {'roe':['TTM Net Income', "Shareholder's Equity", 'ROE'], 'roa':['TTM Net Income', "Total Assets", 'ROA']}
+df = pd.DataFrame()
+
+for parameter in report.keys():
+    url = 'https://www.macrotrends.net/stocks/charts/'+ticker+'/'+company_name+'/'+parameter
+    page = requests.get(url)
+    tree = html.fromstring(page.content)
+    table = tree.xpath('//table') 
+    tstring = lxml.etree.tostring(table[0], method='html')
+    
+    df_ratios = pd.read_html(tstring)[0]
+    df_ratios.rename(columns={df_ratios.columns[0]:'Date', df_ratios.columns[1]:report[parameter][0],
+                             df_ratios.columns[2]:report[parameter][1], df_ratios.columns[3]:report[parameter][2]}, 
+                     inplace=True)
+    df = pd.concat([df, df_ratios], axis=1)
+df['Ticker'] = ticker
+df['Company'] = company_name
