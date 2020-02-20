@@ -1,0 +1,20 @@
+import json, requests
+import pandas as pd
+
+url_cap ='https://www.macrotrends.net/assets/php/market_cap.php?t=AAPL'
+r_cap = requests.get(url_cap)
+come_cap = r_cap.text.find('chartData')
+fim_cap = r_cap.text[r_cap.text.find('chartData'):].find(';')
+
+s_cap = r_cap.text[come_cap+12:come_cap+fim_cap]
+d_cap = json.loads(s_cap)
+df_cap = pd.DataFrame(d_cap)
+
+url_stock ='https://www.macrotrends.net/assets/php/stock_price_history.php?t=AAPL'
+r_stock = requests.get(url_stock)
+come_stock = r_stock.text.find('dataDaily')
+fim_stock = r_stock.text[r_stock.text.find('dataDaily'):].find(';')
+
+s_stock = r_stock.text[come_stock+12:come_stock+fim_stock]
+d_stock = json.loads(s_stock)
+df_stock = pd.DataFrame(d_stock)
