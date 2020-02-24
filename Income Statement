@@ -1,0 +1,90 @@
+import lxml
+from lxml import html
+import requests
+import numpy as np
+import pandas as pd
+
+#url for json data of ticker and company name
+url_tickers = 'https://www.macrotrends.net/assets/php/ticker_search_list.php'
+#fetch the parsed page
+page_tickers = requests.get(url_tickers)
+
+#convert to json format
+json_data = page_tickers.json()
+#convert to dataframe
+df_tickers = pd.DataFrame(json_data)
+#split a column with 'Ticker - Name"
+new = df_tickers['n'].str.split(" - ", n = 1, expand = True) 
+df_tickers['Ticker'] = new[0]
+df_tickers['Company'] = new[1]
+df_tickers = df_tickers.set_index('Ticker')
+
+ticker = 'MSFT'
+company_name = df_tickers.loc[ticker]['Company']
+
+#input what you need
+report = ['revenue', 'cost-goods-sold', 'gross-profit', 
+          'research-development-expenses', 'selling-general-administrative-expenses',
+         'operating-expenses', 'total-non-operating-income-expense',
+         'pre-tax-income', 'total-provision-income-taxes', 'income-after-taxes',
+         'income-from-continuous-operations', 'income-from-discontinued-operations',
+         'net-income', 'ebitda', 'ebit','basic-shares-outstanding', 'shares-outstanding',
+         'eps-basic-net-earnings-per-share', 'eps-earnings-per-share-diluted', 'total-assets',
+         'total-liabilities', 'total-share-holder-equity', 'total-liabilities-share-holders-equity']
+
+#create empty data frame with header
+df = pd.DataFrame(columns=['Time','Value', 'Period', 'Variable', 'Ticker', 'Company', 'new'])
+
+for parameter in report:
+    url = 'https://www.macrotrends.net/stocks/charts/'+ticker+'/'+company_name+'/'+parameter
+    page = requests.get(url)
+    
+    #parse the page with LXML to do XPATH queries
+    tree = html.fromstring(page.content)
+    
+    #fetch all table elements on the page
+    table = tree.xpath('//table') 
+    
+    #convert the table back to a string to be parsed by Pandas
+    tstring_A = lxml.etree.tostring(table[0], method='html')
+    tstring_Q = lxml.etree.tostring(table[1], method='html')
+
+    #read html into a pandas dataframe for the annual results
+    df_A = pd.read_html(tstring_A)[0]
+    df_A['Period'] = 'A'
+    df_A['Variable'] = parameter
+    df_A['Ticker'] = ticker
+    df_A['Company'] = company_name
+    df_A.rename(columns={df_A.columns[0]:'Time', df_A.columns[1]:'Value'}, inplace=True)
+    df_A['Time'] = df_A['Time'].astype(str)
+    df_A['new'] = 'FY'+df_A.Time.str[2:]
+
+    #read html into a pandas dataframe for the quarterly results
+    df_Q = pd.read_html(tstring_Q)[0]
+    df_Q['Period'] = 'Q'
+    df_Q['Variable'] = parameter
+    df_Q['Ticker'] = ticker
+    df_Q['Company'] = company_name
+    df_Q.rename(columns={df_Q.columns[0]:'Time', df_Q.columns[1]:'Value'}, inplace=True)
+    df_Q['Time'] = df_Q['Time'].astype(str)
+    df_Q['new'] = df_Q.Time.str[1]+df_Q.Time.str[0]+df_Q.Time.str[-2]+df_Q.Time.str[-1]
+    
+    #Fix the quarters for the companies with fiscal year not ending in December
+    n = df_Q.shape[0]-1
+    for i in range(0,n):
+        quarter = int(df_Q['Time'][n-i][1])
+        year = int(df_Q['Time'][n-i][5:])
+        quarter2 = int(df_Q['Time'][n-i-1][1])
+        year2 = int(df_Q['Time'][n-i-1][5:])
+
+        if quarter2<quarter and year==year2:
+            df_Q['new'][n-i-1] = str(quarter2)+'Q'+str(year2+1)
+        if quarter<quarter2 and year<year2:
+            df_Q['new'][n-i] = str(quarter)+'Q'+str(year+1)
+        if quarter<quarter2 and int(df_Q['new'][n-i][2:])>int(df_Q['new'][n-i-1][2:]):
+            df_Q['new'][n-i-1] = str(quarter2)+'Q'+str(year2+1)
+    
+    df = df.append(df_A, ignore_index=True)
+    df = df.append(df_Q, ignore_index=True)
+    
+df['Value_Numeric_in_Million'] = pd.to_numeric(df['Value'].str.replace(',', '', regex=True).str.replace('$', '', regex=True))
